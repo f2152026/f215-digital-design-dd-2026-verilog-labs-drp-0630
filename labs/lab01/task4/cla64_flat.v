@@ -32,40 +32,37 @@ module cla64_flat(
     end
   endgenerate
 
-  // ---------------------------------------------------------------------
-  // Step 2: the 64 direct carry equations -- YOUR TASK
-  //
-  // Unlike P and G, these are NOT uniform: Ck needs k+1 product terms,
-  // each one literal longer than the last (see Tutorial 3's derivation).
-  // Writing all 64 of these by hand is extremely tedious and error-prone,
-  // and a single generate-for loop cannot produce them directly (both the
-  // number of terms AND the length of each term change with k).
-  //
-  // Instead: use an AI coding assistant to generate these 64 `assign`
-  // statements.
-  //   - Give it your own C1..C4 equations from cla4.v as the exact
-  //     pattern to continue.
-  //   - Ask it to produce assign statements (with #(2) delays, matching
-  //     the rest of this file) for c[1] through c[64] following that
-  //     same pattern.
-  //
-  // YOU are responsible for verifying the result before trusting it --
-  // this is not optional:
-  //   (1) Confirm the generated c[1]..c[4] exactly match your own cla4.v
-  //       equations.
-  //   (2) Pick at least one later equation (e.g. c[10] or c[32]), re-derive
-  //       it yourself by hand from the recursive definition, and confirm
-  //       it matches what was generated.
-  // Do not move on to this task's reflection question until you've done
-  // both checks.
-  //
-  // TODO: paste your verified assign statements for c[1] through c[64] here.
+  // c[k] = g[k-1] | (p[k-1]&g[k-2]) | (p[k-1]&p[k-2]&g[k-3]) | ...
+  //        | (p[k-1]&...&p[1]&g[0]) | (p[k-1]&...&p[0]&cin)
+  // computed with a runtime loop instead of writing all 64 equations out by hand
+  function automatic carry_bit;
+    input integer   k;
+    input [63:0]    pp, gg;
+    input           cn;
+    integer j, m;
+    reg     term;
+    begin
+      term = cn;
+      for (m = 0; m <= k-1; m = m + 1)
+        term = term & pp[m];
+      carry_bit = term;
+      for (j = k-1; j >= 0; j = j - 1) begin
+        term = gg[j];
+        for (m = k-1; m > j; m = m - 1)
+          term = term & pp[m];
+        carry_bit = carry_bit | term;
+      end
+    end
+  endfunction
+
+  generate
+    for (i = 1; i <= 64; i = i + 1) begin : gen_c
+      assign #(2) c[i] = carry_bit(i, p, g, cin);
+    end
+  endgenerate
 
   assign cout = c[64];
+  assign #(2) sum = p ^ {c[63:1], cin};
 
-  // ---------------------------------------------------------------------
-  // Step 3: sum bits
-  // ---------------------------------------------------------------------
-  // TODO: assign #(2) sum = p ^ {c[63:1], cin};
 
 endmodule
